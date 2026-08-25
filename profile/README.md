@@ -1,85 +1,80 @@
 # Resonator
 
-P2P protocol for discovery, communication and distributed computing
+Peer-to-peer network where the wire language is RDF.
 
 ```
-  Station (UI)          Station (UI)
-      |                     |
-   Antenna               Antenna
-      |                     |
-   Carrier ---[ Tox ]--- Carrier
+    app / rsntr                          app / rsntr
+         |                                    |
+   +-------------+                      +-------------+
+   |   SPARQL    |                      |   SPARQL    |
+   |   SQLite    |                      |   SQLite    |
+   +-------------+                      +-------------+
+         |                                    |
+        iroh -------[ RDF envelope ]-------- iroh
 ```
 
-## Layers
+There is no server and no central feed. A node's identity is an ed25519
+keypair; two nodes that have each other's public key can talk.
 
-### Carrier `C`
+## The node `Rust`
 
-**Encrypted P2P transport**
+**SQLite, peer-to-peer, and SPARQL over both**
 
-A 30 KB static C library and streaming CLI built on the
-[Tox protocol](https://en.wikipedia.org/wiki/Tox_(protocol)).
-Encrypted peer-to-peer tunnels with automatic NAT traversal and
-peer discovery. The wire protocol is RDF Turtle -- every message
-is a set of triples. Extra triples pass through untouched, so the
-protocol is extensible without versioning. Supports text, files,
-audio/video calls, groups, and raw binary pipe mode. Embeddable
-in any language via C FFI.
+Storage is SQLite. Transport is [iroh](https://iroh.computer) over QUIC, which
+proves both identities and opens the channel. SPARQL executes over that SQLite,
+so the same data is reachable as rows or as triples.
 
-### Antenna `Rust`
+It ships as Rust crates and is meant to be embedded — which is how the iOS and
+Android clients are built. There is a Python package (pyo3/maturin) for
+notebook use, and a mod system for extending a node.
 
-**RDF stream processor and triplestore**
+## rsntr `CLI`
 
-An embedded RDF triplestore (Oxigraph) with a reactive compute layer.
-Turtle in, Turtle out. Data flows through a DAG of JavaScript
-scripts (QuickJS) connected by named channels with clock signals --
-no polling. Queries and mutations use the SPIN vocabulary, so they
-are themselves RDF (`sp:Select`, `sp:InsertData`,
-etc.). The pipeline definition is also live RDF -- queryable and
-hot-reloadable at runtime via the same SPARQL interface it serves.
+**The console tool**
 
-### Station `Flutter`
+Multi-platform, exposing every function of a node. Built to sit inside shell
+pipelines and to be comfortable for LLM agents, and it serves the web
+interface.
 
-**Fractal zoom UI**
+## The envelope `protocol`
 
-Cross-platform UI (iOS, macOS, web) with a continuous fractal zoom
-viewport. Objects appear as icons, cards, or full views depending
-on zoom scale. Portals map remote spaces into local coordinates --
-no teleport, just zoom through. Only renders what is visible, so
-rendering cost stays constant regardless of universe size.
+**Engine-neutral wire, engine-specific payload**
 
-## Concepts
+Every message on the network is an RDF object serialised as Turtle. A query is
+also an RDF object, carrying its engine-specific text as a literal:
 
-### Storage
+```turtle
+[] a rsntr:Query ;
+   rsntr:mod    "sql-sqlite" ;
+   rsntr:signal "SELECT name, seen FROM _peers ORDER BY seen DESC" .
+```
 
-**Everything is RDF triples**
+That split is the point. The wire language is shared, so every peer must speak
+it; the query payload stays engine-specific, so a Postgres or DuckDB node can
+join, answer through its own authenticator, and ask questions of its own.
+Peers speak the payload families they understand and render what they can.
 
-All data is stored as RDF triples: messages, scripts, pipeline
-definitions, UI state. Any peer can add statements about any
-resource without coordination (open-world semantics). Graphs from
-multiple sources merge naturally. Vocabularies are RDF too, and
-can be extended at runtime. No schema migrations -- new predicates
-just appear.
+Transport sits behind a trait. iroh is the current base; Bluetooth and radio
+are the reason the seam exists.
 
-### Querying
+## Repositories
 
-**SPARQL via the SPIN vocabulary**
+| | |
+|---|---|
+| [rsntr](https://github.com/Resonator-LLC/rsntr) | The v3 workspace: core crates, the console tool, the Python package, mobile FFI. |
 
-Queries are not a separate API. They are RDF documents sent on
-the same channel as data. A `sp:Select` triple carries
-a SPARQL query; Antenna evaluates it and emits result triples.
-`sp:Ask`, `sp:Construct`,
-`sp:InsertData`, `sp:DeleteData` and
-`sp:Modify` cover the full CRUD surface. Because
-queries are data, scripts can generate and chain them.
+`carrier` and `antenna` were the v2 architecture — a C transport over Tox and a
+JavaScript stream processor. They are archived and no longer developed. The
+[history page](https://resonator.network/docs/history.html) covers how v2
+became v3.
 
-### Exchange
+## Licensing
 
-**Channels with clock signals**
+The node is AGPL-3.0-only, with commercial licences available separately. The
+Python package and the mod PDK are MIT, so writing clients and mods never
+requires AGPL compliance.
 
-Data moves through named channels that carry Turtle RDF strings.
-Each channel has a clock file descriptor that wakes subscribers
-when new data arrives -- no polling. Scripts wire into the DAG
-via `antenna:in` / `antenna:out` connections,
-forming fan-in/fan-out topologies. Any process that can read and
-write Turtle can participate: sensors, audio, mesh radios, other
-Antennas, or Carrier peers across the network.
+## Links
+
+- [resonator.network](https://resonator.network) — protocol and documentation
+- [resonator.am](https://resonator.am) — the company, and what else we build
