@@ -70,9 +70,13 @@ became v3.
 
 ## Licensing
 
-The node is AGPL-3.0-only, with commercial licences available separately. The
-Python package and the mod PDK are MIT, so writing clients and mods never
-requires AGPL compliance.
+Dual licensed under **Apache-2.0 or MIT**, at your option. That covers the whole
+workspace: the node, `rsntr`, the Python package, the mod PDK and the example
+mods. Nothing here requires you to open source what you build on it, run it as a
+service, or embed it in a closed product. No CLA.
+
+The permissive choice is deliberate: a network is worth what its reach is worth,
+so third-party nodes, clients, mods and embedders are the point.
 
 ## Links
 
